@@ -1,19 +1,32 @@
 package manager
 
-import "github.com/rgbkrk/libvirt-go"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/rgbkrk/libvirt-go"
+)
+
+// VPS is a simplified version of actual VPS stored in libvirt
+type VPS struct {
+	Name     string
+	RAM      uint64
+	DiskSize uint64
+}
 
 // LibvirtFacade is a facade over libvirt for easier VPS management
 type LibvirtFacade struct {
-	conn *libvirt.VirConnection
+	conn            *libvirt.VirConnection
+	defaultPoolName string
 }
 
 // NewLibvirtFacade is a simple constructor for LibvirtFacade
-func NewLibvirtFacade(uri string) (*LibvirtFacade, error) {
+func NewLibvirtFacade(uri string, defaultPoolName string) (*LibvirtFacade, error) {
 	conn, err := libvirt.NewVirConnection(uri)
 	if err != nil {
 		return nil, err
 	}
-	facade := LibvirtFacade{conn: &conn}
+	facade := LibvirtFacade{conn: &conn, defaultPoolName: defaultPoolName}
 	return &facade, nil
 }
 
@@ -22,12 +35,30 @@ func (l *LibvirtFacade) Close() (int, error) {
 	return l.conn.CloseConnection()
 }
 
-func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeG float64) (*libvirt.VirStorageVol, error) {
+// CreateVPSDisk givens size in megabytes creates a disk for VPS given it's name
+func (l *LibvirtFacade) CreateVPSDisk(vpsName string, sizeM uint64) error {
+	_, err := l.createVolume(l.defaultPoolName, l.generateVPSDiskName(vpsName), sizeM)
+	return err
+}
+
+// CreateVPS defines VPS given a unique name, RAM size and creates a disk of given size
+func (l *LibvirtFacade) CreateVPS(name string, ramSize uint64, diskSize uint64) (VPS, error) {
+	// TODO: Create VPS and Disk for real
+	vps := VPS{Name: name, RAM: ramSize, DiskSize: diskSize}
+	return vps, nil
+}
+
+func (l *LibvirtFacade) generateVPSDiskName(vpsName string) string {
+	// TODO: Some intellectual VPS disk name generation
+	return fmt.Sprintf("%s-disk-0", vpsName)
+}
+
+func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeM uint64) (*libvirt.VirStorageVol, error) {
 	xmlConfig := `<volume> <name>` + volumeName + `</name>
     <allocation>0</allocation>
-    <capacity unit="G">2</capacity>
+    <capacity unit="M">` + strconv.FormatUint(sizeM, 10) + `</capacity>
     <target>
-      <path>` + volumeName + `.img</path>
+      <path>` + volumeName + `</path>
       <permissions>
         <owner>107</owner>
         <group>107</group>
@@ -37,6 +68,7 @@ func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeG f
     </target>
   </volume>`
 
+	fmt.Printf(xmlConfig)
 	pool, err := l.conn.LookupStoragePoolByName(poolName)
 	if err != nil {
 		return nil, err
@@ -46,17 +78,13 @@ func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeG f
 	return &volume, err
 }
 
-func (l *LibvirtFacade) createPool(name string) (*libvirt.VirStoragePool, error) {
+func (l *LibvirtFacade) createPool(name string, path string) (*libvirt.VirStoragePool, error) {
 	poolDefinition := `
   <pool type='dir'>
   	<name>` + name + `</name>
-  	<uuid>8c79f996-cb2a-d24d-9822-ac7547ab2d01</uuid>
-  	<capacity unit='bytes'>4306780815</capacity>
-  	<allocation unit='bytes'>237457858</allocation>
-  	<available unit='bytes'>4069322956</available>
   	<source></source>
   	<target>
-  		<path>/root/images</path>
+  		<path>` + path + `</path>
   			<permissions>
   			<mode>0755</mode>
   			<owner>-1</owner>
