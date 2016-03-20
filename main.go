@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
+	"github.com/syradium/libvirt_rest_go/api"
 	"github.com/syradium/libvirt_rest_go/manager"
 )
 
@@ -13,13 +13,6 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	defer conn.Close()
 
-	vps, err := conn.CreateVPS("test-vps", 128, 1)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Print(vps)
+	api.StartAPI(*conn)
 }

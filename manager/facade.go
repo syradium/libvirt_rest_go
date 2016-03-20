@@ -9,9 +9,9 @@ import (
 
 // VPS is a simplified version of actual VPS stored in libvirt
 type VPS struct {
-	Name     string
-	RAM      uint64
-	DiskSize uint64
+	Name     string `json:"name"`
+	RAM      uint64 `json:"ram,string"`
+	DiskSize uint64 `json:"disk_size,string"`
 }
 
 // LibvirtFacade is a facade over libvirt for easier VPS management
@@ -102,6 +102,20 @@ func (l *LibvirtFacade) DestroyVPS(vps *VPS) error {
 	}
 
 	return domain.Destroy()
+}
+
+// RemoveVPS undefines VPS and removes all related volumes
+func (l *LibvirtFacade) RemoveVPS(vps *VPS) error {
+	domain, err := l.conn.LookupDomainByName(vps.Name)
+	if err != nil {
+		return err
+	}
+
+	if err = domain.Destroy(); err != nil {
+		return err
+	}
+	// TODO: Delete all related volumes
+	return domain.Undefine()
 }
 
 // GetVPSByName returns VPS struct for a given VPS. nil if not found
