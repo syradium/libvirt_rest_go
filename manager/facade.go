@@ -64,6 +64,56 @@ func (l *LibvirtFacade) CreateVPS(name string, ramSize uint64, diskSize uint64) 
 	return &vps, nil
 }
 
+// StopVPS sends shutdown signal to VPS
+func (l *LibvirtFacade) StopVPS(vps *VPS) error {
+	domain, err := l.conn.LookupDomainByName(vps.Name)
+	if err != nil {
+		return err
+	}
+
+	return domain.Shutdown()
+}
+
+// StartVPS brings VPS online
+func (l *LibvirtFacade) StartVPS(vps *VPS) error {
+	domain, err := l.conn.LookupDomainByName(vps.Name)
+	if err != nil {
+		return err
+	}
+
+	return domain.Create()
+}
+
+// RebootVPS reboots VPS
+func (l *LibvirtFacade) RebootVPS(vps *VPS) error {
+	domain, err := l.conn.LookupDomainByName(vps.Name)
+	if err != nil {
+		return err
+	}
+
+	return domain.Reboot(0)
+}
+
+// DestroyVPS forcibly stops VPS
+func (l *LibvirtFacade) DestroyVPS(vps *VPS) error {
+	domain, err := l.conn.LookupDomainByName(vps.Name)
+	if err != nil {
+		return err
+	}
+
+	return domain.Destroy()
+}
+
+// GetVPSByName returns VPS struct for a given VPS. nil if not found
+func (l *LibvirtFacade) GetVPSByName(name string) (*VPS, error) {
+	_, err := l.conn.LookupDomainByName(name)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: Gather necessary info and plug it into VPS struct, maybe plug in VirtDomain structure
+	return &VPS{Name: name}, nil
+}
+
 func (l *LibvirtFacade) generateVPSDiskName(vpsName string) string {
 	// TODO: Some intellectual VPS disk name generation
 	return fmt.Sprintf("%s-disk-0", vpsName)
