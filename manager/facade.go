@@ -21,12 +21,26 @@ type LibvirtFacade struct {
 }
 
 // NewLibvirtFacade is a simple constructor for LibvirtFacade
-func NewLibvirtFacade(uri string, defaultPoolName string) (*LibvirtFacade, error) {
+func NewLibvirtFacade(uri string, defaultPoolName string, poolPath string) (*LibvirtFacade, error) {
 	conn, err := libvirt.NewVirConnection(uri)
 	if err != nil {
 		return nil, err
 	}
+
 	facade := LibvirtFacade{conn: &conn, defaultPoolName: defaultPoolName}
+
+	pools, err := facade.listPools()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, p := range pools {
+		if p == defaultPoolName {
+			return &facade, nil
+		}
+	}
+
+	facade.createPool(defaultPoolName, poolPath)
 	return &facade, nil
 }
 
@@ -134,6 +148,7 @@ func (l *LibvirtFacade) generateVPSDiskName(vpsName string) string {
 }
 
 func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeM uint64) (*libvirt.VirStorageVol, error) {
+	// TODO: Generate XML instead of this ...
 	xmlConfig := `<volume> <name>` + volumeName + `</name>
     <allocation>0</allocation>
     <capacity unit="MB">` + strconv.FormatUint(sizeM, 10) + `</capacity>
@@ -158,6 +173,7 @@ func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeM u
 }
 
 func (l *LibvirtFacade) createPool(name string, path string) (*libvirt.VirStoragePool, error) {
+	// TODO: Generate XML instead of this ...
 	poolDefinition := `
   <pool type='dir'>
   	<name>` + name + `</name>
@@ -173,7 +189,18 @@ func (l *LibvirtFacade) createPool(name string, path string) (*libvirt.VirStorag
   </pool>`
 
 	pool, err := l.conn.StoragePoolDefineXML(poolDefinition, 0)
-	pool.Create(0)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := pool.Create(0); err != nil {
+		return nil, err
+	}
+
+	if err := pool.SetAutostart(true); err != nil {
+		return nil, err
+	}
 
 	if err != nil {
 		return nil, err
@@ -183,6 +210,7 @@ func (l *LibvirtFacade) createPool(name string, path string) (*libvirt.VirStorag
 }
 
 func (l *LibvirtFacade) createVPS(params VPS, poolName string, volumeName string) (libvirt.VirDomain, error) {
+	// TODO: Generate XML instead of this ...
 	xmlConfig := `<domain type='qemu'>
 	  <name>` + params.Name + `</name>
 	  <memory unit='MB'>` + strconv.FormatUint(params.RAM, 10) + `</memory>
@@ -208,4 +236,13 @@ func (l *LibvirtFacade) createVPS(params VPS, poolName string, volumeName string
 	</domain>`
 
 	return l.conn.DomainDefineXML(xmlConfig)
+}
+
+func (l *LibvirtFacade) listPools() ([]string, error) {
+	pools, err := l.conn.ListStoragePools()
+	if err != nil {
+		return nil, err
+	}
+
+	return pools, nil
 }

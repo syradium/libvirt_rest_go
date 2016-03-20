@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	conn, err := manager.NewLibvirtFacade("qemu:///system", "mypool")
+	conn, err := manager.NewLibvirtFacade("qemu:///system", "mypool", "/root/images")
 	if err != nil {
 		log.Fatal(err)
 		return
