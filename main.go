@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/syradium/libvirt_rest_go/manager"
@@ -14,9 +15,11 @@ func main() {
 	}
 	defer conn.Close()
 
-	err = conn.CreateVPSDisk("vps-123", 1024)
+	vps, err := conn.CreateVPS("test-vps", 128, 1)
 
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Print(vps)
 }

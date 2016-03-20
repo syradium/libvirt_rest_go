@@ -36,16 +36,32 @@ func (l *LibvirtFacade) Close() (int, error) {
 }
 
 // CreateVPSDisk givens size in megabytes creates a disk for VPS given it's name
-func (l *LibvirtFacade) CreateVPSDisk(vpsName string, sizeM uint64) error {
-	_, err := l.createVolume(l.defaultPoolName, l.generateVPSDiskName(vpsName), sizeM)
-	return err
+func (l *LibvirtFacade) CreateVPSDisk(vpsName string, sizeM uint64) (string, error) {
+	diskName := l.generateVPSDiskName(vpsName)
+	_, err := l.createVolume(l.defaultPoolName, diskName, sizeM)
+	return diskName, err
 }
 
 // CreateVPS defines VPS given a unique name, RAM size and creates a disk of given size
-func (l *LibvirtFacade) CreateVPS(name string, ramSize uint64, diskSize uint64) (VPS, error) {
+func (l *LibvirtFacade) CreateVPS(name string, ramSize uint64, diskSize uint64) (*VPS, error) {
 	// TODO: Create VPS and Disk for real
 	vps := VPS{Name: name, RAM: ramSize, DiskSize: diskSize}
-	return vps, nil
+	volume, err := l.CreateVPSDisk(vps.Name, vps.DiskSize)
+
+	if err != nil {
+		return nil, err
+	}
+
+	domain, err := l.createVPS(vps, l.defaultPoolName, volume)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = domain.Create(); err != nil {
+		return nil, err
+	}
+
+	return &vps, nil
 }
 
 func (l *LibvirtFacade) generateVPSDiskName(vpsName string) string {
@@ -56,7 +72,7 @@ func (l *LibvirtFacade) generateVPSDiskName(vpsName string) string {
 func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeM uint64) (*libvirt.VirStorageVol, error) {
 	xmlConfig := `<volume> <name>` + volumeName + `</name>
     <allocation>0</allocation>
-    <capacity unit="M">` + strconv.FormatUint(sizeM, 10) + `</capacity>
+    <capacity unit="MB">` + strconv.FormatUint(sizeM, 10) + `</capacity>
     <target>
       <path>` + volumeName + `</path>
       <permissions>
@@ -100,4 +116,32 @@ func (l *LibvirtFacade) createPool(name string, path string) (*libvirt.VirStorag
 	}
 
 	return &pool, err
+}
+
+func (l *LibvirtFacade) createVPS(params VPS, poolName string, volumeName string) (libvirt.VirDomain, error) {
+	xmlConfig := `<domain type='qemu'>
+	  <name>` + params.Name + `</name>
+	  <memory unit='MB'>` + strconv.FormatUint(params.RAM, 10) + `</memory>
+	  <currentMemory unit='MB'>` + strconv.FormatUint(params.RAM, 10) + `</currentMemory>
+	  <vcpu>2</vcpu>
+	  <os>
+	    <type arch='x86_64' machine='pc'>hvm</type>
+	    <boot dev='cdrom'/>
+	  </os>
+	  <devices>
+	    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+	    <disk type='file' device='cdrom'>
+	      <source file='/root/iso/debian-8.3.0-amd64-netinst.iso'/>
+	      <target dev='hdc'/>
+	      <readonly/>
+	    </disk>
+	    <disk type='volume' device='disk'>
+	      <source pool='` + poolName + `' volume='` + volumeName + `' />
+	      <target dev='hda'/>
+	    </disk>
+	    <graphics type='vnc' autoport='yes'/>
+	  </devices>
+	</domain>`
+
+	return l.conn.DomainDefineXML(xmlConfig)
 }
