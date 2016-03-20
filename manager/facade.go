@@ -68,7 +68,6 @@ func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeM u
     </target>
   </volume>`
 
-	fmt.Printf(xmlConfig)
 	pool, err := l.conn.LookupStoragePoolByName(poolName)
 	if err != nil {
 		return nil, err
