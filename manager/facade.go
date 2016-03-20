@@ -47,26 +47,23 @@ func (l *LibvirtFacade) createVolume(poolName string, volumeName string, sizeG f
 }
 
 func (l *LibvirtFacade) createPool(name string) (*libvirt.VirStoragePool, error) {
-	poolDefinition :=
-		`
+	poolDefinition := `
   <pool type='dir'>
-  <name>` + name + `</name>
-  <uuid>8c79f996-cb2a-d24d-9822-ac7547ab2d01</uuid>
-  <capacity unit='bytes'>4306780815</capacity>
-  <allocation unit='bytes'>237457858</allocation>
-  <available unit='bytes'>4069322956</available>
-  <source>
-  </source>
-  <target>
-  <path>/root/images</path>
-  <permissions>
-  <mode>0755</mode>
-  <owner>-1</owner>
-  <group>-1</group>
-  </permissions>
-  </target>
-  </pool>
-  `
+  	<name>` + name + `</name>
+  	<uuid>8c79f996-cb2a-d24d-9822-ac7547ab2d01</uuid>
+  	<capacity unit='bytes'>4306780815</capacity>
+  	<allocation unit='bytes'>237457858</allocation>
+  	<available unit='bytes'>4069322956</available>
+  	<source></source>
+  	<target>
+  		<path>/root/images</path>
+  			<permissions>
+  			<mode>0755</mode>
+  			<owner>-1</owner>
+  			<group>-1</group>
+  		</permissions>
+  	</target>
+  </pool>`
 
 	pool, err := l.conn.StoragePoolDefineXML(poolDefinition, 0)
 	pool.Create(0)
