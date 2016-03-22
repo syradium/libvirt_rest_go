@@ -3,13 +3,16 @@ package api
 import (
 	"net/http"
 
+	"github.com/RichardKnop/machinery/v1"
+	"github.com/RichardKnop/machinery/v1/signatures"
 	"github.com/emicklei/go-restful"
 	"github.com/syradium/libvirt_rest_go/manager"
 )
 
 // VPSService ...
 type VPSService struct {
-	conn manager.LibvirtFacade
+	mq   *machinery.Server
+	conn *manager.LibvirtFacade
 }
 
 // Register ...
@@ -46,6 +49,13 @@ func (v VPSService) Register() {
 		Operation("startVPS").
 		Param(ws.PathParameter("vps-name", "identifier of the vps").DataType("string")).
 		Writes(manager.VPS{}))
+
+	ws.Route(ws.GET("task/{task-uuid}").To(v.getTaskInfo).
+		// docs
+		Doc("get task info").
+		Operation("getTaskInfo").
+		Param(ws.PathParameter("task-uuid", "UUID of a task").DataType("string")))
+
 	restful.Add(ws)
 }
 
@@ -62,12 +72,32 @@ func (v VPSService) createVPS(request *restful.Request, response *restful.Respon
 		return
 	}
 
-	if _, err := v.conn.CreateVPS(vps.Name, vps.RAM, vps.DiskSize); err != nil {
+	task := signatures.TaskSignature{
+		Name: "createVPS",
+		Args: []signatures.TaskArg{
+			{
+				Type:  "string",
+				Value: vps.Name,
+			},
+			{
+				Type:  "uint64",
+				Value: vps.RAM,
+			},
+			{
+				Type:  "uint64",
+				Value: vps.DiskSize,
+			},
+		},
+	}
+
+	asyncResult, err := v.mq.SendTask(&task)
+
+	if err != nil {
 		response.WriteHeaderAndJson(http.StatusNotFound, err, "application/json")
 		return
 	}
 
-	response.WriteHeaderAndEntity(http.StatusCreated, vps)
+	response.WriteHeaderAndEntity(http.StatusCreated, asyncResult.GetState().TaskUUID)
 }
 
 func (v VPSService) stopVPS(request *restful.Request, response *restful.Response) {
@@ -90,4 +120,17 @@ func (v VPSService) startVPS(request *restful.Request, response *restful.Respons
 		return
 	}
 	v.conn.StartVPS(vps)
+}
+
+func (v VPSService) getTaskInfo(request *restful.Request, response *restful.Response) {
+	taskUUID := request.PathParameter("task-uuid")
+	backend := v.mq.GetBackend()
+	taskState, err := backend.GetState(taskUUID)
+
+	if err != nil {
+		response.WriteHeaderAndJson(http.StatusNotFound, err, "application/json")
+		return
+	}
+
+	response.WriteAsJson(taskState)
 }

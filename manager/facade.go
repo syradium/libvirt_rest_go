@@ -58,7 +58,6 @@ func (l *LibvirtFacade) CreateVPSDisk(vpsName string, sizeM uint64) (string, err
 
 // CreateVPS defines VPS given a unique name, RAM size and creates a disk of given size
 func (l *LibvirtFacade) CreateVPS(name string, ramSize uint64, diskSize uint64) (*VPS, error) {
-	// TODO: Create VPS and Disk for real
 	vps := VPS{Name: name, RAM: ramSize, DiskSize: diskSize}
 	volume, err := l.CreateVPSDisk(vps.Name, vps.DiskSize)
 
